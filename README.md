@@ -12,12 +12,12 @@ Based on [claude-pipe](https://github.com/bluzir/claude-pipe) by bluzir.
 2. **MCP servers** — see `.mcp.json.example` for Exa configuration
 3. **API keys** (see `.env.example` files in each skill's `scripts/` directory):
 
-| Service | File | Required For |
-|---------|------|-------------|
-| [Exa](https://exa.ai) | `.mcp.json` | Web search (all queries) |
-| [GetXAPI](https://getxapi.com) | `.claude/skills/getxapi/scripts/.env` | Twitter/X search |
-| [Yandex Search](https://yandex.cloud) | `.claude/skills/yandex-search/scripts/.env` | Russian locale search |
-| [Telegram MTProto](https://my.telegram.org) | `.claude/skills/telegram-search/scripts/.env` | Telegram channel search |
+| Service                                     | File                                          | Required For             |
+| ------------------------------------------- | --------------------------------------------- | ------------------------ |
+| [Exa](https://exa.ai)                       | `.mcp.json`                                   | Web search (all queries) |
+| [GetXAPI](https://getxapi.com)              | `.claude/skills/getxapi/scripts/.env`         | Twitter/X search         |
+| [Yandex Search](https://yandex.cloud)       | `.claude/skills/yandex-search/scripts/.env`   | Russian locale search    |
+| [Telegram MTProto](https://my.telegram.org) | `.claude/skills/telegram-search/scripts/.env` | Telegram channel search  |
 
 ### Quick Start
 
@@ -36,11 +36,11 @@ cd .claude/skills/telegram-search/scripts && bun run auth.ts
 
 ## Usage
 
-| Command | Description |
-|---------|-------------|
-| `/adhoc` | Quick fact-check research, no pipeline |
+| Command     | Description                                          |
+| ----------- | ---------------------------------------------------- |
+| `/adhoc`    | Quick fact-check research, no pipeline               |
 | `/research` | Full pipeline (plan → research → synthesis → report) |
-| `/setup` | Pipeline overview and modification guides |
+| `/setup`    | Pipeline overview and modification guides            |
 
 ## Architecture
 

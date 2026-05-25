@@ -45,20 +45,13 @@ Triggers — any of:
 Use: `skill: setup`
 ```
 
-### 4. Edit (File Operations)
+**After any pipeline change** (skill modified, agent created/renamed, phase logic updated):
 
-Route to direct file editing when the request is about:
+1. Bump `version` in the modified skill's frontmatter
+2. Add a changelog entry to `CHANGELOG.md` at repo root under `## {skill-name}` → `### v{new-version}`
+3. Update the `See CHANGELOG.md` reference in the skill file if it doesn't exist yet
 
-* Creating, modifying, or deleting files in this workspace
-* Code implementation, document writing
-* Project setup, configuration changes
-* Artifact generation
-
-```markdown
-Use: Read/Write/Edit tools directly
-```
-
-## Implicit Routing
+### Implicit Routing
 
 | User says...                                                       | Means...       | Action                    |
 | ------------------------------------------------------------------ | -------------- | ------------------------- |
@@ -66,7 +59,7 @@ Use: Read/Write/Edit tools directly
 | Numbered list of specific factual questions (prices, terms, specs) | Adhoc Research | `skill: adhoc`            |
 | "find", "search", "research", "look up", "compare" (open-ended)    | Research       | `skill: manager-research` |
 | "how do I", "what is", "explain", "tell me about"                  | Research       | `skill: manager-research` |
-| "setup", "/setup", "pipeline overview", "upgrade pipeline"         | Setup          | `skill: setup`             |
+| "setup", "/setup", "pipeline overview", "upgrade pipeline"         | Setup          | `skill: setup`            |
 | "create", "write", "edit", "modify", "add", "remove", "fix"        | Edit           | Direct file tools         |
 | Specific file path + change request                                | Edit           | Direct file tools         |
 

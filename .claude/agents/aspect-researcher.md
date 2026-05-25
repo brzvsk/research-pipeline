@@ -1,7 +1,7 @@
 ---
 name: aspect-researcher
 description: Researches a single aspect using Exa, Yandex, Twitter, and Telegram patterns defined in this project. Use for per-aspect research workers that gather findings and write YAML outputs.
-model: sonnet
+model: haiku
 tools:
   - mcp__exa__web_search_exa
   - mcp__exa__crawling_exa

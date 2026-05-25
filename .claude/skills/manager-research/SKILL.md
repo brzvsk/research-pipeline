@@ -1,11 +1,11 @@
 ---
 name: manager-research
 type: manager
-version: v4.4
+version: v4.5
 description: "Research pipeline orchestration (phases 1-5) with user confirmation. Supports BOTH web search (exa) AND Twitter/X (getxapi) for real-world experience. Optional counter-thesis exploration for dialectical synthesis. Use this skill when the user wants comprehensive research on a topic. ALWAYS confirms the research plan with the user before firing research workers. Pauses after research with a results summary before proceeding to synthesis."
 ---
 
-# Research Pipeline Manager v4.4
+# Research Pipeline Manager v4.5
 
 ## Purpose
 
@@ -21,12 +21,23 @@ Orchestrate multi-phase research pipeline from topic decomposition to final repo
 ## Overview
 
 ```
-Phase 1        Phase 1.5        Phase 2         Phase 2.5        Phase 3       Phase 4        Phase 5
-Planning  ───▶ Confirm ───▶  Research ×N ───▶  Summary +  ───▶ Synthesis ───▶ Quality ───▶ Report (MD + HTML)
-   │              │              │               Confirm            │             │            │
-   ▼              ▼              ▼                  │               ▼             ▼            ▼
+Phase 1        Phase 1.5        Phase 2         Phase 2.5           Phase 3+4              Phase 5
+Planning  ───▶ Confirm ───▶  Research ×N ───▶  Summary +  ───▶  synthesizer agent  ───▶  report-generator agent
+   │              │              │               Confirm            │         │                  │
+   ▼              ▼              ▼                  │               ▼         ▼                  ▼
 plan.yaml    user confirms   aspects/*.yaml   user confirms   synthesis.yaml  quality.yaml  *_REPORT.md + *.html
+                                                              [paths only returned to orchestrator]
 ```
+
+**Agent split:**
+
+| Phase | Agent               | Tools                 | Returns                                          |
+| ----- | ------------------- | --------------------- | ------------------------------------------------ |
+| 2     | `aspect-researcher` | search + Read + Write | `aspects/*.yaml` paths                           |
+| 3+4   | `synthesizer`       | Read + Write          | `synthesis.yaml`, `quality.yaml` paths + verdict |
+| 5     | `report-generator`  | Read + Write          | `*_REPORT.md`, `*_REPORT.html` paths             |
+
+Orchestrator passes **file paths only** between agents — never raw research content.
 
 ## Clarification Protocol
 
@@ -56,7 +67,7 @@ Before starting:
 
 **Actions:**
 
-1. Invoke research-planner skill with topic (and optional counter_thesis)
+1. Invoke research-planner skill with topic (and optional counter\_thesis)
 2. Decompose into 3-7 thesis aspects (+ 2-3 counter-thesis if enabled)
 3. Generate queries for each aspect
 
@@ -228,13 +239,13 @@ For each aspect in plan.aspects:
 
 **Query prefix conventions:**
 
-| Prefix in plan.yaml | Routes to                                                  | Cost                                             |
-| ------------------- | ---------------------------------------------------------- | ------------------------------------------------ |
-| *(no prefix)*       | exa web search                                             | \~$0.001                                         |
-| `twitter_query:`    | getxapi Twitter search                                     | \~$0.001                                         |
-| `yandex_query:`     | Yandex `web-search` (default)                              | \~$0.004                                         |
-| `yandex_gen_query:` | Yandex `generative-answer`                                 | \~$0.042 — **max 1 per aspect**                  |
-| `telegram_query:`   | Telegram `search-query` → `search-hashtag` on 429         | quota-limited — **1 per aspect**                 |
+| Prefix in plan.yaml | Routes to                                         | Cost                             |
+| ------------------- | ------------------------------------------------- | -------------------------------- |
+| *(no prefix)*       | exa web search                                    | \~$0.001                         |
+| `twitter_query:`    | getxapi Twitter search                            | \~$0.001                         |
+| `yandex_query:`     | Yandex `web-search` (default)                     | \~$0.004                         |
+| `yandex_gen_query:` | Yandex `generative-answer`                        | \~$0.042 — **max 1 per aspect**  |
+| `telegram_query:`   | Telegram `search-query` → `search-hashtag` on 429 | quota-limited — **1 per aspect** |
 
 ### Web Research Pattern (search-safeguard)
 
@@ -347,8 +358,8 @@ for query in telegram_queries:  # prefixed "telegram_query:" in plan.yaml (alway
 
 **Cost estimate per Russian research session:**
 
-| Depth  | Aspects | Yandex gen calls | Telegram calls | Approx Yandex cost |
-| ------ | ------- | ---------------- | -------------- | ------------------ |
+| Depth  | Aspects | Yandex gen calls | Telegram calls  | Approx Yandex cost |
+| ------ | ------- | ---------------- | --------------- | ------------------ |
 | quick  | 3       | 3                | 3 (quota-based) | \~$0.13            |
 | medium | 5       | 5                | 5 (quota-based) | \~$0.21            |
 | deep   | 7       | 7                | 7 (quota-based) | \~$0.29            |
@@ -417,11 +428,11 @@ Proceed to synthesis? (or name an aspect to re-run)
 
 **User Options:**
 
-| Response | Action |
-| -------- | ------ |
-| "Proceed" / "Yes" / "Go" | Continue to Phase 3 |
-| "Re-run [aspect name]" | Re-run that aspect worker, then re-present summary |
-| "Stop" / "Cancel" | Halt pipeline, report status |
+| Response                 | Action                                             |
+| ------------------------ | -------------------------------------------------- |
+| "Proceed" / "Yes" / "Go" | Continue to Phase 3                                |
+| "Re-run \[aspect name]"  | Re-run that aspect worker, then re-present summary |
+| "Stop" / "Cancel"        | Halt pipeline, report status                       |
 
 **Wait for explicit user response before proceeding.**
 
@@ -429,7 +440,7 @@ Proceed to synthesis? (or name an aspect to re-run)
 
 ***
 
-## Phase 3: Synthesis
+## Phase 3+4: Synthesis + Quality Gate
 
 **Gate:**
 
@@ -438,119 +449,83 @@ type: quality_threshold
 condition: "count(aspects/*.yaml) >= 3"
 ```
 
-**Actions:**
+**Pre-phase: update state.yaml**
 
-1. Load all aspect files
-2. Invoke synthesis skill
-3. Find cross-aspect patterns
-4. Generate aggregated insights
+```yaml
+current_phase: synthesis
+phase_states.synthesis: in_progress
+last_updated: now()
+```
 
 **Orchestration:**
 
 ```
-Skill(skill: "synthesis")
+# Pass file paths only — never raw research content
+Task(
+  subagent_type: "synthesizer",
+  description: "Synthesize findings + quality gate",
+  prompt: |
+    session_id: {session_id}
+    aspects_path: artifacts/{session}/aspects/
+    plan_path: artifacts/{session}/plan.yaml
+    synthesis_output_path: artifacts/{session}/synthesis.yaml
+    quality_output_path: artifacts/{session}/quality.yaml
+)
 
-# Synthesis skill reads from artifacts/{session}/aspects/
-# Writes to artifacts/{session}/synthesis.yaml
+# Synthesizer returns:
+result = {
+  synthesis_path: "artifacts/{session}/synthesis.yaml",
+  quality_path: "artifacts/{session}/quality.yaml",
+  verdict: PASS|WARN|FAIL,
+  total_score: 0.0-1.0,
+  issues_count: 0
+}
 ```
 
-**Output:** `artifacts/{session}/synthesis.yaml`
+**Post-task: schema validation**
+
+After the synthesizer Task returns, assert the following before proceeding:
+
+```
+synthesis = Read("artifacts/{session}/synthesis.yaml")
+
+Assert synthesis.insights[*].type is present        # observation|recommendation|warning
+Assert synthesis.cross_aspect_patterns[*].type is present  # recurring|contradiction|causal|gap
+Assert synthesis.source_summary is present
+Assert synthesis.quality_metrics is present
+
+If any assertion fails:
+  Report missing fields to user
+  Ask: "Retry synthesis or patch manually?"
+  Halt until resolved
+```
+
+**Post-phase: update state.yaml**
 
 ```yaml
-# synthesis.yaml schema
-metadata:
-  session_id: string
-  aspects_count: number
-  total_findings: number
-  total_sources: number
-  created_at: timestamp
-
-insights:
-  - id: string
-    title: string
-    description: string
-    evidence:
-      - finding_id: string
-        aspect_id: string
-        weight: number
-    confidence: high|medium|low
-
-cross_aspect_patterns:
-  - pattern: string
-    aspects: string[]
-    strength: number
-
-themes:
-  - name: string
-    insights: string[]
-
-quality_metrics:
-  saturation: number      # 0-100, information completeness
-  diversity: number       # 0-1, source variety
-  tier_quality: number   # Weighted avg of source tiers
-  evidence_depth: number # Avg findings per insight
+phase_states.synthesis: completed
+phase_states.quality_gate: completed
+last_updated: now()
 ```
 
-**Next:** Phase 4
+**Routing on verdict:**
 
-***
+| Verdict | Action                                                           |
+| ------- | ---------------------------------------------------------------- |
+| PASS    | → Phase 5                                                        |
+| WARN    | → Phase 5 (pass issues\_count to report-generator)               |
+| FAIL    | → Report gaps to user, suggest re-running affected aspects, halt |
 
-## Phase 4: Quality Gate
+**Outputs:**
 
-**Gate:**
-
-```yaml
-type: file_exists
-condition: "synthesis.yaml"
-```
-
-**Actions:**
-
-1. Invoke quality-gate skill
-2. Evaluate against thresholds
-3. Route based on verdict
-
-**Orchestration:**
-
-```
-Skill(skill: "quality-gate")
-
-quality = Read("artifacts/{session}/quality.yaml")
-
-# Route based on verdict
-```
-
-**Output:** `artifacts/{session}/quality.yaml`
-
-```yaml
-# quality.yaml schema
-verdict: PASS|WARN|FAIL
-scores:
-  saturation: number
-  diversity: number
-  tier_quality: number
-  evidence_depth: number
-thresholds:
-  saturation: 50
-  diversity: 0.5
-  tier_quality: 0.6
-issues: string[]
-recommendations: string[]
-```
-
-**Routing:**
-
-| Verdict | Action                             |
-| ------- | ---------------------------------- |
-| PASS    | → Phase 5                          |
-| WARN    | → Phase 5 (with caveats noted)     |
-| FAIL    | → Report gaps, suggest re-research |
+* `artifacts/{session}/synthesis.yaml`
+* `artifacts/{session}/quality.yaml`
 
 **Next:** Phase 5 or halt
 
 ***
 
-## Phase 5: Report Generation (ENHANCED)
+## Phase 5: Report Generation
 
 **Gate:**
 
@@ -559,167 +534,43 @@ type: quality_verdict
 condition: "verdict in [PASS, WARN]"
 ```
 
-**Execution model: foreground only**
+**Pre-phase: update state.yaml**
 
-Both report tasks run foreground — they use `Read` and `Write` tool calls to load synthesis data and write output files.
-
-**Actions:**
-
-1. Invoke MD report generator — wait for completion
-2. Invoke HTML report generator — wait for completion
-3. Update state to completed
+```yaml
+current_phase: report
+phase_states.report: in_progress
+last_updated: now()
+```
 
 **Orchestration:**
 
 ```
-# 1. Generate Markdown Report
-# run_in_background: false — needs Read/Write tool calls
+# Pass file paths only — agent reads all content from disk
 Task(
   subagent_type: "report-generator",
-  run_in_background: false,
-  description: "Generate MD report",
+  description: "Generate MD + HTML report",
   prompt: |
-    Generate research report in Markdown format:
-    - synthesis_path: artifacts/{session}/synthesis.yaml
-    - plan_path: artifacts/{session}/plan.yaml
-    - quality_path: artifacts/{session}/quality.yaml
-    - session_id: {session}
-    - output_path: artifacts/{session}/{topic_slug}_REPORT.md
-
-    Create comprehensive report with:
-    - Executive Summary
-    - Market Context
-    - Key sections based on themes from synthesis
-    - Recommendations
-    - Sources with tier classifications
-    - Research methodology notes
+    session_id: {session_id}
+    synthesis_path: artifacts/{session}/synthesis.yaml
+    quality_path: artifacts/{session}/quality.yaml
+    plan_path: artifacts/{session}/plan.yaml
+    output_dir: artifacts/{session}/
+    topic_slug: {topic_slug}
 )
 
-# 2. Generate HTML Report (after MD completes — reads the MD file)
-# run_in_background: false — needs Read/Write tool calls
-Task(
-  subagent_type: "report-generator",
-  run_in_background: false,
-  description: "Generate HTML report",
-  prompt: |
-    Generate a VISUAL HTML report from the research data.
+# report-generator returns:
+result = {
+  md_report_path: "artifacts/{session}/{topic_slug}_REPORT.md",
+  html_report_path: "artifacts/{session}/{topic_slug}_REPORT.html"
+}
+```
 
-    **IMPORTANT:** This is the Phase 5 report generator. Follow the create-document design standards below.
+**Post-phase: update state.yaml**
 
-    Read source files:
-    - artifacts/{session}/synthesis.yaml
-    - artifacts/{session}/plan.yaml
-    - artifacts/{session}/quality.yaml
-    - artifacts/{session}/{topic_slug}_REPORT.md
-
-    Output to: artifacts/{session}/{topic_slug}_REPORT.html
-
-    ## Design System (AI Sreda Default — No Exceptions)
-
-    Use these tokens. Do NOT use purple gradients, glassmorphism, emoji decoration, decorative icons, fake KPI cards, or generic AI templates.
-
-    ```
-    --bg: #fafaf8;            /* warm off-white page background */
-    --surface: #ffffff;       /* white card surface */
-    --warm: #f5f3ef;          /* warm tint for diagram zones */
-    --text: #1a1a1a;          /* graphite — near-black body */
-    --text-sub: #5c5c5c;      /* secondary text */
-    --text-soft: #8a8a8a;     /* tertiary/metadata text */
-    --border: #e2e0dc;        /* section borders */
-    --border-subtle: #eeede9; /* card borders */
-    --teal: #0d9488;          /* primary accent */
-    --teal-bg: #e8f7f4;      /* teal callout background */
-    --teal-dark: #0b7a6f;    /* teal hover/stat text */
-    --amber: #b45309;         /* warning accent */
-    --amber-bg: #fef7ed;     /* warning callout background */
-    --green: #15803d;         /* success/PASS */
-    --green-bg: #f0faf2;     /* success callout background */
-    --slate: #475569;         /* info accent */
-    --slate-bg: #f1f5f9;     /* info callout background */
-    --shadow-card: 0 1px 2px rgba(0,0,0,0.04), 0 2px 8px rgba(0,0,0,0.03);
-    --shadow-raised: 0 2px 4px rgba(0,0,0,0.04), 0 6px 16px rgba(0,0,0,0.05);
-    --radius: 8px;
-    --radius-lg: 12px;
-    --font-sans: "DM Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
-    --font-serif: "Newsreader", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
-    ```
-
-    **Font rules:** Reference DM Sans and Newsreader in font-family stacks with system fallbacks (do NOT load Google Fonts CDN). The fonts render as system-ui/Georgia on machines without them. Add `-webkit-font-smoothing: antialiased`.
-
-    **No external dependencies:** Single self-contained .html file. No CDN links. No external JS. No external CSS.
-
-    ## Document Structure
-
-    The report is a single-column, max-width ~920px, centered layout. No sidebars. No sticky headers.
-
-    ### 1. Header
-    - Eyebrow: "Research Report · [Month Year]"
-    - H1 title
-    - Subtitle paragraph (thesis statement, max 2-3 sentences)
-    - Stats row: grid of 5 stat cards (findings, sources, insights, aspects, quality verdict)
-    - Wide border-bottom separator
-
-    ### 2. Paradigm Diagram (inline SVG)
-    Draw an 800×280 SVG showing the core thesis:
-    - **Left panel** ("PRE-BUILT SCREENS"): warm background rectangle containing smaller rects for "Dashboard with nav paths", "Form pages & workflows", and "Human navigates function calls via menus & clicks"
-    - **Arrow** between panels
-    - **Right panel** ("TOOL SURFACES"): teal-tinted background with small rects for "Tool Schema (typed action)" (2×), a larger "Tool Registry" rect (versioned schemas, per-tenant, deprecation), "Agent harness composes tools from intent" bar, and a dashed-border note "Visual artifacts rendered on-demand"
-    - Caption below: "The paradigm shift: from pre-built navigation paths to agent-composed tool surfaces..."
-
-    ### 3. Executive Summary
-    3-4 paragraphs in the body font. First paragraph opens with the strongest claim. Include key stats inline.
-
-    ### 4. Research Sections (5 numbered sections)
-    Each section starts with `<h2><span class="num">N</span>Title</h2>`.
-
-    Use **three callout box types** interspersed:
-    - `.callout.evidence` — teal background, left border: key evidence, protocol specs, data points
-    - `.callout.data` — slate background, left border: comparisons, frameworks, structured info
-    - `.callout.warning` — amber background, left border: risks, Jevons paradox, security gaps
-
-    For analyst timelines (e.g. 2026→2030 projections), use the **timeline pattern**: alternating rows with year label on the left and prediction text on the right. Each row has a source citation below the text.
-
-    ### 5. Key Insights Grid (3-column grid at desktop, 1-column on mobile)
-    Each card contains:
-    - Confidence badge (`.conf-badge .conf-high` = green, `.conf-medium` = amber)
-    - h4 title
-    - Short description (2-3 sentences max)
-    - Sources note: "N sources · [tier] tier"
-
-    ### 6. Recommendations (2×2 grid at desktop, 1-column on mobile)
-    Four cards: "For SaaS Companies", "For Enterprise Software Buyers", "For Designers & Product Builders", "For Investors"
-    Each card has an h4 title and a `<ul>` with 5 action items.
-
-    ### 7. Quality & Methodology
-    Two tables:
-    1. Metric | Value | Threshold | Result (PASS in green)
-    2. Tier | Count | Description (S:12, A:45, B:15, C:4 tiers with pill badges)
-    Followed by a methodology paragraph in sans-serif smaller text.
-
-    ### 8. Footer
-    Three lines: research date, stat summary, quality summary. Centered. Light text color.
-
-    ## Interaction & Motion
-    - Only motion: view-driven fade-in on sections (`@media prefers-reduced-motion: no-preference`)
-    - No hover effects beyond row highlight
-    - No click handlers, no JS dependencies
-
-    ## Responsive
-    - 768px breakpoint: stats → 3-col, insight/rec grids → 1-col, h1 smaller
-    - 480px breakpoint: stats → 2-col, smaller padding
-
-    ## Quality Gate (check before output)
-    - [ ] First viewport communicates thesis + research scope immediately
-    - [ ] No purple/blue gradients, no glassmorphism, no emoji
-    - [ ] No external CDN dependencies
-    - [ ] System font stack with fallbacks (not loaded from external sources)
-    - [ ] SVG diagram renders the shift visually
-    - [ ] prefers-reduced-motion respected
-    - [ ] Responsive at 768px and 480px
-    - [ ] Every insight is traceable to synthesis data
-    - [ ] All claims grounded in source citations
-    - [ ] Page renders non-blank when opened in a browser
-)
+```yaml
+phase_states.report: completed
+current_phase: completed
+last_updated: now()
 ```
 
 **Output:**
@@ -897,69 +748,4 @@ Status: COMPLETED
 
 ***
 
-## Key Changes from v1.0
-
-| Feature           | v1.0          | v2.0                         |
-| ----------------- | ------------- | ---------------------------- |
-| User confirmation | None          | **MANDATORY after planning** |
-| Search delays     | Random jitter | **Predictable 600ms**        |
-| Report output     | MD only       | **MD + HTML**                |
-| HTML design       | N/A           | **Light theme, teal accent** |
-
-## Key Changes from v2.0
-
-| Feature          | v2.0                | v3.0                          |
-| ---------------- | ------------------- | ----------------------------- |
-| Sources          | exa web search only | **exa + Twitter/X (getxapi)** |
-| Source selection | N/A                 | **source\_type per aspect**   |
-| Twitter queries  | N/A                 | **twitter-research skill**    |
-| Findings         | web only            | **web + tweets merged**       |
-
-## Key Changes from v3.0
-
-| Feature          | v3.0                     | v4.0                                         |
-| ---------------- | ------------------------ | -------------------------------------------- |
-| Locale detection | None                     | **Auto-detect russian vs global in planner** |
-| Russian topics   | exa only (no RU sources) | **exa + Yandex generative-answer**           |
-| Global topics    | exa + Twitter            | **exa + Twitter (unchanged)**                |
-| Source types     | web / twitter / both     | **+ yandex (exa + Yandex generative)**       |
-| Yandex queries   | N/A                      | **Natural-language RU questions preferred**  |
-| Generative mode  | N/A                      | **Yandex generative-answer as primary call** |
-
-## Key Changes from v4.0
-
-| Feature         | v4.0                             | v4.1                                        |
-| --------------- | -------------------------------- | ------------------------------------------- |
-| Phase 2 workers | `subagent_type: general-purpose` | **`subagent_type: aspect-researcher`**      |
-| Phase 5 workers | `subagent_type: general-purpose` | **`subagent_type: report-generator`**       |
-| Agent context   | Anonymous agent, no tool spec    | **Named agent with defined tools + skills** |
-
-## Key Changes from v4.1
-
-| Feature                    | v4.1                                  | v4.2                                                    |
-| -------------------------- | ------------------------------------- | ------------------------------------------------------- |
-| HTML report design         | Generic prompt, frontend-design skill | **create-document standards embedded in skill**         |
-| Design system              | Referenced externally                 | **Inline CSS tokens, font stacks, color palette**       |
-| SVG paradigm diagram       | None                                  | **800×280 inline SVG: PRE-BUILT SCREENS → TOOL SURFACES** |
-| Callout boxes              | None                                  | **evidence / data / warning callout types**             |
-| Timeline pattern           | None                                  | **Year + prediction rows for analyst data**             |
-| Quality gate for HTML      | None                                  | **10-item checklist before output**                     |
-| External dependencies      | Google Fonts CDN                      | **Zero external deps — system font stacks**             |
-| Generic AI aesthetics      | Allowed                               | **Explicitly banned (no purple gradients, glassmorphism, emoji)** |
-
-## Key Changes from v4.2
-
-| Feature                    | v4.2                     | v4.3                                                    |
-| -------------------------- | ------------------------ | ------------------------------------------------------- |
-| Counter-thesis             | None                     | **Optional 2-3 counter-aspects for dialectical synthesis** |
-| Planner invocation         | Topic only               | **Passes counter_thesis flag to research-planner**      |
-| Phase 1.5 presentation     | Flat aspect list         | **Thesis/counter-thesis grouped separately**            |
-| Synthesis                  | Aggregate findings only  | **Detects counter-thesis aspects, convergence analysis** |
-
-## Key Changes from v4.3
-
-| Feature                    | v4.3                             | v4.4                                                       |
-| -------------------------- | -------------------------------- | ---------------------------------------------------------- |
-| Post-research gate         | None — synthesis started immediately | **Phase 2.5: summary table + user checkpoint**         |
-| Research visibility        | Silent until synthesis           | **Aspect-by-aspect summary with findings count + key source** |
-| User control               | No mid-pipeline control          | **Can re-run individual aspects before synthesis starts**  |
+See [CHANGELOG.md](/CHANGELOG.md) for version history.
