@@ -80,14 +80,14 @@ Run web searches first, then Twitter searches, merge results:
 
 Three search operations run sequentially. **Yandex web-search is the default; generative is used for one query only.**
 
-**Yandex script path:** `/Users/brzvsk/Documents/research/.claude/skills/yandex-search/scripts/client.ts`
+**Yandex script path:** `.claude/skills/yandex-search/scripts/client.ts`
 
 **Step A — Yandex web-search** (`yandex_query:` prefixed, cheap \~$0.004/req):
 
 ```bash
 # For each yandex_query: prefixed query (strip prefix before running):
 sleep 0.6
-npx -y bun run /Users/brzvsk/Documents/research/.claude/skills/yandex-search/scripts/client.ts web-search '{query}'
+npx -y bun run .claude/skills/yandex-search/scripts/client.ts web-search '{query}'
 ```
 
 * Parse `SUCCESS: { results[] }` — extract title, url, snippet
@@ -99,7 +99,7 @@ npx -y bun run /Users/brzvsk/Documents/research/.claude/skills/yandex-search/scr
 ```bash
 # For the single yandex_gen_query: prefixed query (strip prefix):
 sleep 1.0  # hard rate limit: 1 req/s
-npx -y bun run /Users/brzvsk/Documents/research/.claude/skills/yandex-search/scripts/client.ts generative-answer '{query}'
+npx -y bun run .claude/skills/yandex-search/scripts/client.ts generative-answer '{query}'
 ```
 
 * Parse `SUCCESS: { answer, sources[] }`
@@ -120,7 +120,7 @@ mcp__exa__web_search_exa(query, numResults: 8)
 **Step D — Telegram** (`telegram_query:` prefixed, `search-query` first → hashtag fallback if quota exhausted, 1 per aspect):
 
 ```bash
-TG_SCRIPT="/Users/brzvsk/Documents/research/.claude/skills/telegram-search/scripts/client.ts"
+TG_SCRIPT=".claude/skills/telegram-search/scripts/client.ts"
 ```
 
 **1. Determine operation and execute search:**

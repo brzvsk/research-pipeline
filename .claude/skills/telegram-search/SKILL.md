@@ -15,7 +15,7 @@ allowed-tools: Bash(npx -y bun run {baseDir}/scripts/client.ts:*)
 Uses the Telegram MTProto API (teleproto layer 221) to search public channel posts and retrieve full post content.
 
 **Library:** `teleproto@1.221.0` — drop-in gramJS fork, Layer 221, npm alias `telegram`.
-**Script:** `/Users/brzvsk/Documents/research/.claude/skills/telegram-search/scripts/client.ts`
+**Script:** `.claude/skills/telegram-search/scripts/client.ts`
 
 **When to use:**
 - Search Telegram posts by keyword or hashtag
@@ -314,4 +314,4 @@ telegram-search/
     └── .gitignore
 ```
 
-**Requirements:** Bun (`/Users/brzvsk/.bun/bin/bun`) · Telegram Premium account · API credentials from my.telegram.org
+**Requirements:** Bun · Telegram Premium account · API credentials from my.telegram.org

@@ -286,7 +286,7 @@ Two Yandex operations run in the same aspect worker. **web-search is the default
 ```
 # Load yandex-search skill for script path
 Skill(skill: "yandex-search")
-YANDEX_SCRIPT = "/Users/brzvsk/Documents/research/.claude/skills/yandex-search/scripts/client.ts"
+YANDEX_SCRIPT = ".claude/skills/yandex-search/scripts/client.ts"
 
 # 1. Yandex web-search (cheap, ~$0.004/req) — for yandex_query: prefixed queries
 yandex_web_findings = []
@@ -329,7 +329,7 @@ write_findings(all_findings)
 
 ```
 # 4. Telegram (community signal — all public channels)
-TG_SCRIPT = "/Users/brzvsk/Documents/research/.claude/skills/telegram-search/scripts/client.ts"
+TG_SCRIPT = ".claude/skills/telegram-search/scripts/client.ts"
 
 for query in telegram_queries:  # prefixed "telegram_query:" in plan.yaml (always 1)
   stripped = strip_prefix("telegram_query:", query)

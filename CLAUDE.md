@@ -76,6 +76,6 @@ Use: Read/Write/Edit tools directly
 
 ## Skill Reference
 
-* **adhoc**: `/Users/brzvsk/Documents/research/.claude/skills/adhoc`
-* **manager-research**: `/Users/brzvsk/Documents/research/.claude/skills/manager-research`
-* **setup**: `/Users/brzvsk/projects/research/.claude/skills/setup`
+* **adhoc**: `.claude/skills/adhoc`
+* **manager-research**: `.claude/skills/manager-research`
+* **setup**: `.claude/skills/setup`
