@@ -1,0 +1,27 @@
+{
+  "skill_name": "manager-research",
+  "version": "v2.0",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Research the topic: 'Remote work productivity tools for distributed teams'",
+      "expected_output": "Research pipeline completes with MD + HTML reports, user confirms plan before research fires",
+      "files": [],
+      "notes": "Tests basic pipeline with user confirmation step"
+    },
+    {
+      "id": 2,
+      "prompt": "Research 'Sustainable supply chain practices for e-commerce'",
+      "expected_output": "Pipeline pauses at Phase 1.5 for user confirmation, generates both report formats",
+      "files": [],
+      "notes": "Tests that confirmation step appears and both outputs are generated"
+    },
+    {
+      "id": 3,
+      "prompt": "Do research on: AI ethics in healthcare",
+      "expected_output": "Plan presented, user confirms, research executes with 600ms delays, HTML report generated",
+      "files": [],
+      "notes": "Tests full pipeline with healthcare topic"
+    }
+  ]
+}
